@@ -17,6 +17,22 @@ public delegate bool MapFeatureDelegate(MapFeatureData featureData);
 /// <summary>
 ///     Aggregation of all the data needed to render a map feature
 /// </summary>
+public enum ElementType : byte
+{
+    highway,
+    water,
+    railway,
+    natural,
+    boundary,
+    landuse,
+    building,
+    leisure,
+    amenity,
+    name,
+    place,
+    admin_level
+}
+
 public readonly ref struct MapFeatureData
 {
     public long Id { get; init; }
@@ -24,7 +40,8 @@ public readonly ref struct MapFeatureData
     public GeometryType Type { get; init; }
     public ReadOnlySpan<char> Label { get; init; }
     public ReadOnlySpan<Coordinate> Coordinates { get; init; }
-    public Dictionary<string, string> Properties { get; init; }
+    //public Dictionary<string, string> Properties { get; init; }
+    public Dictionary<ElementType, string> Properties { get; init; }
 }
 
 /// <summary>
@@ -181,20 +198,27 @@ public unsafe class DataFile : IDisposable
 
                 if (isFeatureInBBox)
                 {
-                    var properties = new Dictionary<string, string>(feature->PropertyCount);
+                    var properties = new Dictionary<ElementType, string>(feature->PropertyCount);
                     for (var p = 0; p < feature->PropertyCount; ++p)
                     {
                         GetProperty(header.Tile.Value.StringsOffsetInBytes, header.Tile.Value.CharactersOffsetInBytes, p * 2 + feature->PropertiesOffset, out var key, out var value);
-                        properties.Add(key.ToString(), value.ToString());
+                        //properties.Add(key.ToString(), value.ToString());
+                        try {
+                            ElementType elementType = (ElementType)Enum.Parse(typeof(ElementType), key.ToString());
+                            properties.Add(elementType, value.ToString().Split(" ")[0]);
+                        }
+                        catch (Exception e) {
+                            continue;
+                        }
                     }
 
                     if (!action(new MapFeatureData
-                        {
-                            Id = feature->Id,
-                            Label = label,
-                            Coordinates = coordinates,
-                            Type = feature->GeometryType,
-                            Properties = properties
+                    {
+                        Id = feature->Id,
+                        Label = label,
+                        Coordinates = coordinates,
+                        Type = feature->GeometryType,
+                        Properties = properties
                         }))
                     {
                         break;
